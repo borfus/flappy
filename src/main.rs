@@ -2,7 +2,7 @@ use bracket_lib::prelude::*;
 
 const SCREEN_WIDTH: i32 = 30;
 const SCREEN_HEIGHT: i32 = 50;
-const FRAME_DURATION: f32 = 30.0;
+const FRAME_DURATION: f32 = 35.0;
 
 struct State {
     player: Player,
@@ -15,7 +15,7 @@ struct State {
 impl State {
     fn new() -> Self {
         State {
-            player: Player::new(5, 25),
+            player: Player::new(5, 25.0),
             frame_time: 0.0,
             obstacle: Obstacle::new(SCREEN_WIDTH, 0),
             mode: GameMode::Menu,
@@ -59,13 +59,13 @@ impl State {
             self.obstacle = Obstacle::new(self.player.x + SCREEN_WIDTH, self.score);
         }
 
-        if self.player.y > SCREEN_HEIGHT || self.obstacle.hit_obstacle(&self.player) {
+        if self.player.y > SCREEN_HEIGHT as f32 || self.obstacle.hit_obstacle(&self.player) {
             self.mode = GameMode::End;
         }
     }
 
     fn restart(&mut self) {
-        self.player = Player::new(5, 25);
+        self.player = Player::new(5, 25.0);
         self.frame_time = 0.0;
         self.obstacle = Obstacle::new(SCREEN_WIDTH, 0);
         self.mode = GameMode::Playing;
@@ -74,10 +74,13 @@ impl State {
 
     fn dead(&mut self, ctx: &mut BTerm) {
         ctx.cls();
+        ctx.set_active_console(1);
+        ctx.cls();
         ctx.print_centered(5, "You are dead!");
         ctx.print_centered(6, &format!("You earned {} points", self.score));
         ctx.print_centered(8, "(P) Play Again");
         ctx.print_centered(9, "(Q) Quit Game");
+        ctx.set_active_console(0);
 
         if let Some(key) = ctx.key {
             match key {
@@ -107,12 +110,12 @@ enum GameMode {
 
 struct Player {
     x: i32,
-    y: i32,
+    y: f32,
     velocity: f32
 }
 
 impl Player {
-    fn new(x: i32, y: i32) -> Self {
+    fn new(x: i32, y: f32) -> Self {
         Player {
             x,
             y,
@@ -121,17 +124,20 @@ impl Player {
     }
 
     fn render(&mut self, ctx: &mut BTerm) {
-        ctx.set(0, self.y, YELLOW, BLACK, to_cp437('@'));
+        ctx.set_active_console(1);
+        ctx.cls();
+        ctx.set_fancy(PointF::new(0.0, self.y), 1, Degrees::new(0.0), PointF::new(1.0, 1.0), GREEN, BLACK, to_cp437('@'));
+        ctx.set_active_console(0);
     }
 
     fn gravity_and_move(&mut self) {
         if self.velocity < 2.0 {
             self.velocity += 0.4;
         }
-        self.y += self.velocity as i32;
+        self.y += self.velocity;
         self.x += 1;
-        if self.y < 0 {
-            self.y = 0;
+        if self.y < 0.0 {
+            self.y = 0.0;
         }
     }
 
@@ -174,15 +180,19 @@ impl Obstacle {
     fn hit_obstacle(&self, player: &Player) -> bool {
         let half_size = self.size / 2;
         let does_x_match = player.x == self.x;
-        let player_above_gap = player.y < self.gap_y - half_size;
-        let player_below_gap = player.y > self.gap_y + half_size;
+        let player_above_gap = (player.y as i32) < self.gap_y - half_size;
+        let player_below_gap = (player.y as i32) > self.gap_y + half_size;
         does_x_match && (player_above_gap || player_below_gap)
     }
 }
 
 fn main() -> BError {
-    let context = BTermBuilder::simple(SCREEN_WIDTH, SCREEN_HEIGHT)?
+    let context = BTermBuilder::new()
+        .with_font("../resources/terminal8x8.png", 8, 8)
+        .with_simple_console(SCREEN_WIDTH, SCREEN_HEIGHT, "../resources/terminal8x8.png")
+        .with_fancy_console(SCREEN_WIDTH, SCREEN_HEIGHT, "../resources/terminal8x8.png")
         .with_title("flappy")
+        .with_tile_dimensions(8, 20)
         .build()?;
 
     main_loop(context, State::new())
